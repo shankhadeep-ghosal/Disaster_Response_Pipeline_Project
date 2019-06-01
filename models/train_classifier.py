@@ -1,24 +1,100 @@
 import sys
+import pickle
+import re
+import pandas as pd
+import numpy as np
+
+# For Pipeline and ML
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.multioutput import MultiOutputClassifier
+from sklearn.feature_extraction.text import CountVectorizer, TfidfTransformer
+from sklearn.pipeline import Pipeline
+from sklearn.model_selection import train_test_split
+from sklearn.metrics import classification_report
+from sklearn.model_selection import GridSearchCV
+
+# For NLP
+import nltk
+from nltk.tokenize import word_tokenize
+from nltk.stem import WordNetLemmatizer
+
+# Database connection
+from sqlalchemy import create_engine
+
 
 
 def load_data(database_filepath):
-    pass
+    """
+    Input : database_filepath
+    Output: Returns the Features as X and target as y.
+
+    """
+    table_name = 'DisasterResponse'
+    engine = create_engine(f"sqlite:///{database_filepath}")
+    df = pd.read_sql_table('DisasterResponse',engine)
+
+
+    X = df["message"]
+    y = df.drop(["message","id","genre","original"], axis=1)
+    category_names = y.columns
+    return X, y, category_names
 
 
 def tokenize(text):
-    pass
+    '''
+    Function to tokenize the text messages and then normalize 
+    Input: text
+    output: cleaned tokenized text as a list object
+    '''
+    tokens = word_tokenize(text)
+    stopwords_ = stopwords.words("english")
+    tokens = [t for t in tokens if t not in stopwords_]
+    lemmatizer = WordNetLemmatizer()
+    clean_tokens = []
+    for token in tokens:
+        clean_token = lemmatizer.lemmatize(token).lower().strip()
+        clean_tokens.append(clean_token)
+    return clean_tokens
 
 
 def build_model():
-    pass
+    '''
+    Function to build a model, create pipeline, hypertuning as well as gridsearchcv
+    Input: No input
+    Output: Returns the model after parameter tuning
+    '''
+    pipeline = Pipeline([
+        ('vect', CountVectorizer()),
+        ('tfidf', TfidfTransformer()),
+        ('clf', MultiOutputClassifier(RandomForestClassifier()))])
+    
+    parameters = {
+        #'tfidf__use_idf': (True, False),
+        'clf__estimator__n_estimators': [50, 100]
+        #'clf__estimator__min_samples_split': [2, 4]
+        } 
+    cv = GridSearchCV(pipeline, param_grid=parameters)    
+    return cv
 
 
 def evaluate_model(model, X_test, Y_test, category_names):
-    pass
+    '''
+    Function to evaluate a model and return the classification and accurancy score.
+    Inputs: Model, X_test, y_test, Catgegory_names
+    Outputs: Prints the Classification report & Accuracy Score
+    '''
+    y_pred = model.predict(X_test)
+    print(classification_report(y_pred, Y_test.values, target_names=category_names)) 
+    print('Accuracy Score: {}'.format(np.mean(Y_test.values == y_pred)))
 
 
 def save_model(model, model_filepath):
-    pass
+    '''
+    Function to save the model
+    Input: model and the file path to save the model
+    Output: save the model as pickle file in the give filepath 
+    '''
+    pickle.dump(model, open(model_filepath, 'wb'))
 
 
 def main():
